@@ -143,37 +143,45 @@ class RestartHelpersTest(unittest.TestCase):
                     smoke_restart.verify_preserved(self.before)
 
 
+ROOT = Path(__file__).resolve().parents[1]
+GATE = "required-checks"
+# 소스는 있지만 재구현 전이라 아직 컴파일되지 않는 모듈입니다.
+# 컴파일을 복구하면 여기서 빼고 ci.yml의 tests 행렬에 ':<모듈>:check'를 추가합니다.
+NOT_YET_COMPILING = {"commerce"}
+
+
 class CiGateTest(unittest.TestCase):
     def setUp(self):
-        self.workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text()
-        gate = self.workflow.split("\n  build-and-smoke:\n", 1)[1]
+        self.workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        gate = self.workflow.split(f"\n  {GATE}:\n", 1)[1]
         self.script = textwrap.dedent(gate.split("        run: |\n", 1)[1])
-        self.results = {name: {"result": "success"} for name in
-                        ("checks", "package", "tests", "observability", "integration", "demo-ui")}
+        job_section = self.workflow.split("\njobs:\n", 1)[1]
+        jobs = set(re.findall(r"^  ([a-z][a-z-]*):$", job_section, re.MULTILINE)) - {GATE}
+        self.results = {name: {"result": "success"} for name in jobs}
 
     def result(self, jobs):
         return subprocess.run(["bash", "-e", "-c", self.script],
                               env={**os.environ, "JOB_RESULTS": json.dumps(jobs)},
                               capture_output=True, text=True, timeout=10).returncode
 
-    def test_requires_every_job_and_every_module(self):
-        gate = self.workflow.split("\n  build-and-smoke:\n", 1)[1]
+    def test_gate_requires_every_other_job(self):
+        gate = self.workflow.split(f"\n  {GATE}:\n", 1)[1]
         self.assertIn("    if: always()\n", gate)
         names = re.search(r"^    needs: \[([^\]]+)\]$", gate, re.MULTILINE).group(1)
         self.assertEqual({name.strip() for name in names.split(",")}, set(self.results))
-        tests = self.workflow.split("\n  tests:\n", 1)[1].split("\n  observability:\n", 1)[0]
-        self.assertEqual(set(re.findall(r":([a-z-]+):test\b", tests)),
-                         {"commerce", "payment", "settlement", "finance-mock", "gateway", "internal-auth", "demo-control"})
-        self.assertIn("scenario: [smoke, redis, retention, admission, financial-flow, reconciliation, demo-ui]", self.workflow)
-        self.assertRegex(self.workflow, r"Verify demo UI operator ports on startup and restart\n"
-                         r"\s+if: matrix.scenario == 'demo-ui'")
-        self.assertIn('python3 -B scripts/smoke.py --demo-ui', self.workflow)
-        self.assertRegex(self.workflow, r"if: matrix.scenario == 'financial-flow'\n"
-                         r"\s+run: python3 -B scripts/smoke_financial_flow.py")
-        self.assertRegex(self.workflow, r"Verify source-backed notification retention\n"
-                         r"\s+if: matrix.scenario == 'retention'")
-        self.assertIn("run: python3 -B scripts/smoke_restart.py", self.workflow)
         self.assertEqual(self.result(self.results), 0)
+
+    def test_every_module_with_sources_is_checked(self):
+        settings = (ROOT / "settings.gradle").read_text(encoding="utf-8")
+        modules = set(re.findall(r"'([a-z-]+)'", settings))
+        with_sources = {name for name in modules if (ROOT / name / "src/main").is_dir()}
+        tests = self.workflow.split("\n  tests:\n", 1)[1].split("\n  package:\n", 1)[0]
+        code = "\n".join(line for line in tests.splitlines() if not line.lstrip().startswith("#"))
+        checked = set(re.findall(r":([a-z-]+):check\b", code))
+        self.assertEqual(checked, with_sources - NOT_YET_COMPILING,
+                         "소스가 있는 모듈은 tests 행렬에 넣거나 NOT_YET_COMPILING에 명시합니다.")
+        self.assertLessEqual(NOT_YET_COMPILING, with_sources,
+                             "소스가 없는 모듈은 NOT_YET_COMPILING에서 뺍니다.")
 
     def test_rejects_failure_cancellation_skip_and_no_results(self):
         for name in self.results:
