@@ -1,0 +1,18 @@
+.gradle/
+**/build/
+.env
+.env.*
+!.env.example
+.idea/
+*.iml
+.DS_Store
+__pycache__/
+*.py[cod]
+work/
+
+# 로컬 도구 설정
+.mcp.json
+.mcp.json.tmp
+.postman/
+postman/
+.claude/
