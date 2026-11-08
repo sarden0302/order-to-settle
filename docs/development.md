@@ -302,7 +302,7 @@ k6 run -e BASE_URL=http://TEST_SERVER:8080 -e RATE=100 -e DURATION_SECONDS=30 te
 
 Compose는 루프백에만 게시하므로 다른 장비에서 바로 접근할 수 없습니다. 원격 시험은 인증·네트워크 접근을 별도로 설계한 테스트 환경에서 진행합니다.
 
-`RATE`, `DURATION_SECONDS`, `PRE_ALLOCATED_VUS`, `MAX_VUS`는 양의 정수이며 VU 최대값은 사전 할당값 이상이어야 합니다. Compose에서는 `-e RATE=100 -e DURATION_SECONDS=30`처럼 `run` 옵션으로 덮어씁니다. checks·HTTP 실패·`dropped_iterations` 임계값을 확인합니다. 명세 조회 처리량은 결제 승인 완료 TPS가 아닙니다. 결제 확정 처리량·PG 장애·Worker 재시작 뒤 대조는 [결제 부하·장애·복구 시험](../tests/load/README.md)에서 별도 Compose 프로젝트로 실행합니다. 이 도구는 주문 API부터의 업무 흐름·15분 지속 처리량 목표를 검증하지 않습니다.
+`RATE`, `DURATION_SECONDS`, `PRE_ALLOCATED_VUS`, `MAX_VUS`는 양의 정수이며 VU 최대값은 사전 할당값 이상이어야 합니다. Compose에서는 `-e RATE=100 -e DURATION_SECONDS=30`처럼 `run` 옵션으로 덮어씁니다. checks·HTTP 실패·`dropped_iterations` 임계값을 확인합니다. 명세 조회 처리량은 결제 승인 완료 TPS가 아닙니다. 결제 확정 처리량·장애 복구 시험 도구는 재구현하면서 다시 추가합니다.
 
 ### PG 승인·조회·전액 환불
 
@@ -382,7 +382,7 @@ curl http://localhost:18083/mock/accounts/ACCOUNT_ID \
 
 `POST /internal/settlement-reconciliations`에 `{"cutoffAt":"2026-11-03T10:00:00+09:00"}`를 보내면 202와 회차 ID를 받습니다. 같은 마감 재요청은 같은 회차를 반환합니다. 202는 대조 완료가 아닙니다. `GET /internal/settlement-reconciliations/{runId}`, `/results?page=0&size=100`, `/history`로 고정 대상·진행·원인·최근 실행 이력을 확인합니다. 요청 마감은 안전 여유 10분 이전이어야 합니다.
 
-부하·장애 복구 후의 전체 대조는 기존 [부하 검사](../tests/load/README.md)의 검증 범위를 유지하면서 다음 도구로 서비스별 읽기 계약을 연결합니다. URL과 환경 변수는 검증 전용 스택의 값을 사용합니다. `SETTLEMENT_OPERATOR_CREDENTIAL`, `PAYMENT_SETTLEMENT_CREDENTIAL`, `FINANCE_MOCK_SETTLEMENT_CREDENTIAL`은 기존 비밀 설정에서 환경으로 전달하고 명령 인자·기록에 넣지 않습니다.
+부하·장애 복구 후의 전체 대조는 다음 도구로 서비스별 읽기 계약을 연결합니다. URL과 환경 변수는 검증 전용 스택의 값을 사용합니다. `SETTLEMENT_OPERATOR_CREDENTIAL`, `PAYMENT_SETTLEMENT_CREDENTIAL`, `FINANCE_MOCK_SETTLEMENT_CREDENTIAL`은 기존 비밀 설정에서 환경으로 전달하고 명령 인자·기록에 넣지 않습니다.
 
 ```bash
 python3 scripts/reconcile.py --cutoff-at 2026-11-03T10:00:00+09:00 \
@@ -522,8 +522,6 @@ Prometheus는 신규 격리·재시도 소진을 CRITICAL, 도래 후 5분/15분
 SLACK_WEBHOOK_URL_FILE=/path/to/slack-webhook-url \
 docker compose -f compose.yml -f compose.alertmanager-slack.yml --profile observability up -d --wait --wait-timeout 300
 ```
-
-`python3 scripts/test_observability.py`는 격리한 Prometheus→Alertmanager→시험 수신기로 경보·복구 전달을 검사하고 전용 자원을 제거합니다. 실제 Slack을 사용하지 않으며 Settlement는 규칙 검사까지, 금융 접수 복구는 [별도 시험](#금융-관측과-접수-복구)으로 확인합니다.
 
 `./gradlew :commerce:test :payment:test`는 전용 Kafka·PostgreSQL 컨테이너로 전달·저장 경계를 각각 검사하고 종료 시 제거합니다. Docker가 없으면 생략하지 않고 실패합니다. Payment 수신의 인계 대역을 포함하므로 실제 주문→외부 금융 전체 왕복을 대신하지 않습니다. 기본 `build`·CI에 포함되며 개발 DB·Kafka·볼륨을 사용하지 않습니다.
 
@@ -733,16 +731,6 @@ COMPOSE_PROJECT_NAME=commerce-settle-ui-demo COMPOSE_FILE=compose.yml:compose.de
 
 월간 화면은 회차 집계와 `/internal/coupon-issue-runs/{runId}/targets`의 저장된 선정 순위·구매액·혜택·발급 결과를 조회합니다. 웰컴·월간 혜택에 임의 수동 발급 버튼을 추가하지 않습니다. **런타임 업무 시간 이동과 월간 배치 수동 실행은 제공하지 않습니다.** 배송·반품·정산·월간 발급은 실제 기한과 기존 처리기의 준비가 필요합니다. 금융 연동의 준비·검증 범위는 [왕복 검증 범위](#주문결제정산환불-왕복)를 따릅니다.
 
-### 부하 실행과 중지
-
-화면의 부하는 기존 `tests/load/payment_load.py ramp`를 실행합니다. 측정 범위는 **Kafka 직접 주입 → Payment 수신·금융 Mock 승인**이며 주문 API·선착순 경쟁·전체 정산의 부하 시험이 아닙니다. 기존 부하 도구의 [준비·측정·대조 계약](../tests/load/README.md)을 먼저 따릅니다.
-
-전용 프로젝트는 `commerce-settle-ui-load` 또는 그 이름에 짧은 접미사를 붙인 값만 허용합니다. 동일한 `LOAD_PROJECT`와 절대경로 `LOAD_WORK_DIR=<저장소>/tests/load/work/demo-ui/<프로젝트>`로 CLI의 up/prepare/enable을 준비한 후 제어 서버에 `DEMO_LOAD_PROJECT`와 `DEMO_LOAD_ENABLED=true`를 공급합니다. 이 준비는 새 전용 환경에서만 수행하며 기존 개발/시연 프로젝트를 사용하지 않습니다. UI는 기동·DB 준비·Worker 재생성·삭제 명령을 제공하지 않습니다.
-
-한 번에 한 실행, 1~100건/초·1~30초 주입·30초 배출 관측·전체 120초 상한입니다. 중지는 stop 파일로 **추가 주입만 멈추고** 이미 접수한 거래는 계속 관측합니다. `COMPLETED`는 도구의 정상 종료이며 금융 정합성 검증 완료가 아닙니다. summary와 요청 원장으로 기존 reconcile을 수행합니다. 결과는 해당 LOAD_WORK_DIR의 실행 디렉터리에 보존하며 제어 서버 재시작 후에도 파일을 삭제하지 않습니다. 메모리 실행 목록은 최대20건이고 재시작 시 비워집니다. 제어 서버의 정상 종료는 중지 파일 저장이 실패해도 대기 상한 뒤 소유한 실행 프로세스를 정리합니다. 전용 환경을 삭제할 때는 준비 때 사용한 `LOAD_PROJECT`와 `LOAD_WORK_DIR`를 유지하고 [부하 환경 종료](../tests/load/README.md#종료)를 따릅니다. 다른 부하·개발 프로젝트의 이름으로 바꾸지 않습니다.
-
-부하 입력은 화면과 서버에서 범위를 검사합니다. 제어 API의 입력·JSON·경로 타입 오류는 필드별 사유를 포함한 `application/problem+json`으로 반환합니다. 상태 관측 실패 시의 주입 중지·원장 보존은 [부하 도구](../tests/load/README.md#실행)를 따릅니다. 프로세스 강제 종료나 호스트 장애까지 금융 처리 완료·원장 보존을 보장하지는 않습니다.
-
 ### UI 검증과 종료
 
 ```bash
@@ -750,7 +738,6 @@ npm --prefix demo-ui test
 npm --prefix demo-ui run build
 ./gradlew :demo-control:test
 ./gradlew :commerce:test --tests '*GradeCouponIntegrationTest'
-python3 -B -m unittest discover -s tests/load -p 'test_payment_load.py'
 ```
 
-API/역할 격리·미확정·중복 요청·순위의 권한/페이지·중지 동작과 실제 화면을 확인합니다. UI의 경로·요청 필드는 빌드 시 OpenAPI에서 생성하므로 계약 변경 후 다시 생성·빌드합니다. 프론트 테스트·빌드는 CI 필수 결과에 포함합니다. 종료는 시작한 UI/Java 프로세스만 종료하며 연결된 기존 백엔드·DB·사용자 데모를 함께 종료하지 않습니다.
+API/역할 격리·미확정·중복 요청·순위의 권한/페이지와 실제 화면을 확인합니다. UI의 경로·요청 필드는 빌드 시 OpenAPI에서 생성하므로 계약 변경 후 다시 생성·빌드합니다. 프론트 테스트·빌드는 CI 필수 결과에 포함합니다. 종료는 시작한 UI/Java 프로세스만 종료하며 연결된 기존 백엔드·DB·사용자 데모를 함께 종료하지 않습니다.

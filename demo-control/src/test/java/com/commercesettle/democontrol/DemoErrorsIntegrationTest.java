@@ -15,9 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.annotation.DirtiesContext;
 
-@SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "demo.load-enabled=false")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DemoErrorsIntegrationTest {
   @LocalServerPort int port;
@@ -25,40 +23,20 @@ class DemoErrorsIntegrationTest {
   private final ObjectMapper mapper = new ObjectMapper();
 
   @ParameterizedTest
-  @CsvSource({"101,0", "0,31", "1,30"})
-  @DisplayName("범위 오류와 비활성 부하 요청을 공통 오류 계약으로 반환한다")
-  void preservesProblemAndFieldErrors(int rate, int seconds) throws Exception {
-    var response =
-        post("/demo/load-runs", "{\"rate\":" + rate + ",\"seconds\":" + seconds + "}", null);
-    boolean invalid = rate < 1 || rate > 100 || seconds < 1 || seconds > 30;
-    assertProblem(response, invalid ? 400 : 503);
-    var body = mapper.readTree(response.body());
-    if (invalid) {
-      assertThat(body.path("errors")).hasSize(2);
-      assertThat(body.path("errors").toString()).contains("rate", "seconds");
-    }
-  }
-
-  @ParameterizedTest
-  @CsvSource({"'{',body", "'{\"rate\":\"PRIVATE_INVALID_VALUE\",\"seconds\":1}',rate"})
-  @DisplayName("잘못된 JSON과 타입은 거절된 원문 없이 오류 위치를 반환한다")
+  @CsvSource({"'{',body", "'{\"operationId\":\"\"}',operationId"})
+  @DisplayName("잘못된 JSON과 필수값 오류는 거절된 원문 없이 오류 위치를 반환한다")
   void rejectsMalformedBodies(String json, String field) throws Exception {
-    var response = post("/demo/load-runs", json, null);
+    var response = post("/demo/requests", json, null);
     assertProblem(response, 400);
     assertThat(mapper.readTree(response.body()).path("errors").get(0).path("field").asText())
         .isEqualTo(field);
-    assertThat(response.body())
-        .doesNotContain("PRIVATE_INVALID_VALUE", "JsonParseException", "java.lang");
+    assertThat(response.body()).doesNotContain("JsonParseException", "java.lang");
   }
 
   @Test
-  @DisplayName("잘못된 실행 ID와 출처 필터도 같은 문제 응답을 반환한다")
-  void includesPathAndFilterErrors() throws Exception {
-    var mismatch = post("/demo/load-runs/not-a-uuid/stop", "{}", null);
-    assertProblem(mismatch, 400);
-    assertThat(mapper.readTree(mismatch.body()).path("errors").get(0).path("field").asText())
-        .isEqualTo("id");
-    var forbidden = post("/demo/load-runs", "{}", "https://foreign.example");
+  @DisplayName("로컬 UI가 아닌 출처의 요청은 같은 문제 응답으로 거절한다")
+  void rejectsForeignOrigin() throws Exception {
+    var forbidden = post("/demo/requests", "{}", "https://foreign.example");
     assertProblem(forbidden, 403);
     assertThat(mapper.readTree(forbidden.body()).path("detail").asText())
         .isEqualTo("로컬 UI 출처만 허용합니다.");

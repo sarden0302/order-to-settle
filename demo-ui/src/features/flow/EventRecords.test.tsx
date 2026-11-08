@@ -11,7 +11,7 @@ const ORDER = '10000000-0000-4000-8000-000000000001';
 const OTHER = '20000000-0000-4000-8000-000000000002';
 const EVENT = 'aaaaaaaa-0000-4000-8000-000000000001';
 const AT = '2026-11-05T12:00:00+09:00';
-const info: DemoInfo = { gateway: '', operatorServices: [...owners], timeTravel: false, loadEnabled: false, loadProject: '', links: [] };
+const info: DemoInfo = { gateway: '', operatorServices: [...owners], timeTravel: false, links: [] };
 const record = (id = 'first', order = ORDER): Execution => ({ id, at: AT, operation: '주문 조회', method: 'GET', path: '/api/orders/{orderId}',
   actor: 'BUYER', status: 200, elapsedMs: 10, request: { pathParameters: { orderId: order } }, response: { id: order, buyerId: OTHER } });
 const row = (owner: string, kind: 'OUTBOX' | 'INBOX', status: string): Omit<EventRecord, 'owner'> => ({

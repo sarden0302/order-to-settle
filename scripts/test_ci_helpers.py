@@ -14,7 +14,6 @@ from unittest.mock import patch
 import smoke
 import smoke_retention
 import smoke_restart
-from test_observability import integration_rules
 
 
 class CiHelpersTest(unittest.TestCase):
@@ -70,15 +69,6 @@ class CiHelpersTest(unittest.TestCase):
             ), self.assertRaises(AssertionError):
                 smoke.check_kafka_topics()
 
-    def test_only_accelerates_production_group_schedule(self):
-        production = (Path(__file__).resolve().parents[1] / "infra/prometheus/quarantine.rules.yml").read_text()
-        accelerated = integration_rules(production)
-        self.assertIn("    interval: 1s\n", accelerated)
-        self.assertEqual(accelerated.replace("    interval: 1s\n", "    interval: 15s\n"), production)
-
-    def test_accelerates_other_group_intervals_without_changing_expressions(self):
-        production = "groups:\n  - name: other\n    interval: 30s\n    rules:\n      - record: sample\n        expr: rate(sample_total[15s])\n"
-        self.assertEqual(integration_rules(production), production.replace("interval: 30s", "interval: 1s"))
 
 
 class RestartHelpersTest(unittest.TestCase):
