@@ -20,6 +20,17 @@ dependencies {
     testImplementation 'org.testcontainers:junit-jupiter'
 }
 
+// 주문을 다시 구현하기 전까지 주문(Order)에 의존하는 쿠폰·주문 혜택 코드를 빌드에서 뺀다. 주문 재구현 때 이 블록을 지운다.
+// 쿠폰 예외는 다른 클래스에 의존하지 않아 공통 오류 처리기와 함께 남긴다.
+def awaitingOrder = { FileTreeElement file ->
+    (file.name.contains('Coupon') && !file.path.contains('domain/exception/')) || file.name.startsWith('OrderBenefits') ||
+        file.name == 'EventOrderIntegrationTest.java'
+}
+sourceSets {
+    main { java { exclude awaitingOrder } }
+    test { java { exclude awaitingOrder } }
+}
+
 // 내부 호출 자격 판정이 요청을 명세 작업과 대조한다. 테스트도 같은 리소스를 쓴다.
 tasks.named('processResources') {
     from(rootProject.file('docs/openapi.json')) { into 'contracts' }

@@ -1,14 +1,7 @@
 package com.commercesettle.commerce.presentation.exception;
 
-import com.commercesettle.commerce.application.exception.AuthChangeUnconfirmedException;
-import com.commercesettle.commerce.application.exception.AuthRateLimitedException;
-import com.commercesettle.commerce.application.exception.AuthenticationFailedException;
-import com.commercesettle.commerce.application.exception.AuthenticationUnavailableException;
 import com.commercesettle.commerce.application.exception.IdempotencyConflictException;
 import com.commercesettle.commerce.application.exception.OrderRequestException;
-import com.commercesettle.commerce.application.exception.OrderStubException;
-import com.commercesettle.commerce.domain.exception.AccountNotFoundException;
-import com.commercesettle.commerce.domain.exception.BuyerAddressNotFoundException;
 import com.commercesettle.commerce.domain.exception.CouponCampaignConflictException;
 import com.commercesettle.commerce.domain.exception.CouponIssueRunNotFoundException;
 import com.commercesettle.commerce.domain.exception.CouponRecipientNotFoundException;
@@ -16,8 +9,6 @@ import com.commercesettle.commerce.domain.exception.CouponRejectedException;
 import com.commercesettle.commerce.domain.exception.CouponRunConflictException;
 import com.commercesettle.commerce.domain.exception.CouponRunStateUnverifiedException;
 import com.commercesettle.commerce.domain.exception.CouponTemplateNotFoundException;
-import com.commercesettle.commerce.domain.exception.DefaultAddressConflictException;
-import com.commercesettle.commerce.domain.exception.DuplicateAccountEmailException;
 import com.commercesettle.commerce.domain.exception.EventAdmissionClosedException;
 import com.commercesettle.commerce.domain.exception.InsufficientInventoryException;
 import com.commercesettle.commerce.domain.exception.InvalidCouponTermsException;
@@ -86,43 +77,11 @@ public class CommerceExceptionHandler extends ResponseEntityExceptionHandler {
     this.tracer = tracer;
   }
 
-  @ExceptionHandler(
-      com.commercesettle.commerce.domain.model.Notification.StateConflictException.class)
-  ResponseEntity<Object> notificationState(WebRequest request) {
-    return respond(ErrorCode.NOTIFICATION_REPLAY_CONFLICT, request);
-  }
-
-  @ExceptionHandler(com.commercesettle.commerce.domain.exception.OrderStateException.class)
-  ResponseEntity<Object> orderState(
-      com.commercesettle.commerce.domain.exception.OrderStateException e, WebRequest request) {
-    return respond(
-        switch (e.reason()) {
-          case STATE_CONFLICT -> ErrorCode.PAYMENT_STATE_CONFLICT;
-          case REFUND_WINDOW_CLOSED -> ErrorCode.ORDER_REFUND_WINDOW_CLOSED;
-          case REFUND_IN_PROGRESS -> ErrorCode.ORDER_REFUND_IN_PROGRESS;
-        },
-        request);
-  }
-
-  @ExceptionHandler(
-      com.commercesettle.commerce.application.exception.OrderDependencyUnavailableException.class)
-  ResponseEntity<Object> orderDependency(RuntimeException e, WebRequest request) {
-    return respond(ErrorCode.COMMON_TEMPORARILY_UNAVAILABLE, request);
-  }
-
   @ExceptionHandler(OrderRequestException.class)
   ResponseEntity<Object> orderFailure(OrderRequestException e, WebRequest request) {
     return switch (e.kind()) {
       case NOT_FOUND -> respond(ErrorCode.COMMON_RESOURCE_NOT_FOUND, request);
       case INVALID_REQUEST -> invalid(List.of(error(e.field(), e.reason())), request);
-    };
-  }
-
-  @ExceptionHandler(OrderStubException.class)
-  ResponseEntity<Object> orderStubFailure(OrderStubException e, WebRequest request) {
-    return switch (e.kind()) {
-      case NOT_FOUND -> respond(ErrorCode.COMMON_RESOURCE_NOT_FOUND, request);
-      case INVALID_REQUEST -> invalid(List.of(error(e.field(), "입력값의 조합을 확인해 주세요.")), request);
     };
   }
 
@@ -155,21 +114,7 @@ public class CommerceExceptionHandler extends ResponseEntityExceptionHandler {
     };
   }
 
-  @ExceptionHandler(BuyerAddressNotFoundException.class)
-  ResponseEntity<Object> addressNotFound(BuyerAddressNotFoundException e, WebRequest request) {
-    return respond(ErrorCode.COMMON_RESOURCE_NOT_FOUND, "주소를 찾을 수 없습니다.", null, request);
-  }
-
-  @ExceptionHandler(AccountNotFoundException.class)
-  ResponseEntity<Object> accountNotFound(AccountNotFoundException e, WebRequest request) {
-    return respond(ErrorCode.COMMON_RESOURCE_NOT_FOUND, "계정을 찾을 수 없습니다.", null, request);
-  }
-
-  @ExceptionHandler({
-    VersionConflictException.class,
-    OptimisticLockingFailureException.class,
-    DefaultAddressConflictException.class
-  })
+  @ExceptionHandler({VersionConflictException.class, OptimisticLockingFailureException.class})
   ResponseEntity<Object> versionConflict(RuntimeException e, WebRequest request) {
     return respond(ErrorCode.COMMON_VERSION_CONFLICT, request);
   }
@@ -274,77 +219,7 @@ public class CommerceExceptionHandler extends ResponseEntityExceptionHandler {
     return respond(ErrorCode.EVENT_ADMISSION_CLOSED, detail, null, request);
   }
 
-  @ExceptionHandler(DuplicateAccountEmailException.class)
-  ResponseEntity<Object> duplicateEmail(DuplicateAccountEmailException e, WebRequest request) {
-    return respond(ErrorCode.ACCOUNT_EMAIL_DUPLICATED, request);
-  }
-
-  @ExceptionHandler(AuthenticationFailedException.class)
-  ResponseEntity<Object> authenticationFailed(AuthenticationFailedException e, WebRequest request) {
-    return respond(ErrorCode.COMMON_AUTHENTICATION_REQUIRED, request);
-  }
-
-  @ExceptionHandler(AuthRateLimitedException.class)
-  ResponseEntity<Object> rateLimited(AuthRateLimitedException e, WebRequest request) {
-    ErrorCode code = ErrorCode.COMMON_RATE_LIMITED;
-    return ResponseEntity.status(code.status())
-        .header(HttpHeaders.RETRY_AFTER, Long.toString(e.retryAfterSeconds()))
-        .body(problem(code.status(), code, code.detail(), request));
-  }
-
-  @ExceptionHandler(
-      com.commercesettle.commerce.application.exception.OrderCapacityExceededException.class)
-  ResponseEntity<Object> capacity(WebRequest request) {
-    ErrorCode code = ErrorCode.COMMON_CAPACITY_EXCEEDED;
-    return ResponseEntity.status(code.status())
-        .header(HttpHeaders.RETRY_AFTER, "30")
-        .body(problem(code.status(), code, code.detail(), request));
-  }
-
-  /** 인증 저장소를 확인할 수 없으면 인증 실패로 바꾸지 않는다. 세션은 발급되지 않았거나 삭제를 확인하지 못한 상태다. */
-  @ExceptionHandler(AuthenticationUnavailableException.class)
-  ResponseEntity<Object> authenticationUnavailable(
-      AuthenticationUnavailableException e, WebRequest request) {
-    LOGGER
-        .atWarn()
-        .addKeyValue("event", "commerce.auth")
-        .addKeyValue("errorCode", ErrorCode.COMMON_TEMPORARILY_UNAVAILABLE.name())
-        .addKeyValue("errorType", errorType(e))
-        .addKeyValue("traceId", traceId())
-        .log("Auth store is temporarily unavailable");
-    return respond(
-        ErrorCode.COMMON_TEMPORARILY_UNAVAILABLE,
-        "인증 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",
-        null,
-        request);
-  }
-
-  /** 가드를 막은 뒤 결과를 확정하지 못했다. 비밀번호가 이미 바뀌었을 수 있으므로 재전송을 안내하지 않는다. 변경 ID는 재조정에 쓰는 추적 값이며 비밀값이 아니다. */
-  @ExceptionHandler(AuthChangeUnconfirmedException.class)
-  ResponseEntity<Object> authChangeUnconfirmed(
-      AuthChangeUnconfirmedException e, WebRequest request) {
-    LOGGER
-        .atWarn()
-        .addKeyValue("event", "commerce.auth.change")
-        .addKeyValue("result", "UNKNOWN")
-        .addKeyValue("changeId", e.changeId().toString())
-        .addKeyValue("errorCode", ErrorCode.COMMON_TEMPORARILY_UNAVAILABLE.name())
-        .addKeyValue("errorType", errorType(e))
-        .addKeyValue("traceId", traceId())
-        .log("Account auth change is not confirmed");
-    return respond(
-        ErrorCode.COMMON_TEMPORARILY_UNAVAILABLE,
-        "변경 결과를 확인할 수 없습니다. 같은 요청을 다시 보내지 말고 새 비밀번호로 로그인해 확인해 주세요.",
-        null,
-        request);
-  }
-
-  @ExceptionHandler({
-    TransientDataAccessException.class,
-    CannotCreateTransactionException.class,
-    com.commercesettle.commerce.application.port.SettlementRetentionGateway.UnavailableException
-        .class
-  })
+  @ExceptionHandler({TransientDataAccessException.class, CannotCreateTransactionException.class})
   ResponseEntity<Object> temporarilyUnavailable(RuntimeException e, WebRequest request) {
     String traceId = traceId();
     LOGGER
@@ -524,11 +399,6 @@ public class CommerceExceptionHandler extends ResponseEntityExceptionHandler {
     problem.setProperty(CODE, code.name());
     problem.setProperty("traceId", traceId());
     return problem;
-  }
-
-  // 저장소 예외의 종류만 남기고 메시지는 기록하지 않는다.
-  private static String errorType(Exception e) {
-    return (e.getCause() == null ? e : e.getCause()).getClass().getName();
   }
 
   private String traceId() {
