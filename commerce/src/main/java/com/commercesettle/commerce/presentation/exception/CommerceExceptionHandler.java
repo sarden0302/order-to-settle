@@ -1,5 +1,8 @@
 package com.commercesettle.commerce.presentation.exception;
 
+import com.commercesettle.commerce.application.exception.AuthRateLimitedException;
+import com.commercesettle.commerce.application.exception.AuthenticationFailedException;
+import com.commercesettle.commerce.application.exception.AuthenticationUnavailableException;
 import com.commercesettle.commerce.application.exception.IdempotencyConflictException;
 import com.commercesettle.commerce.application.exception.OrderRequestException;
 import com.commercesettle.commerce.domain.exception.AccountEmailDuplicatedException;
@@ -118,6 +121,38 @@ public class CommerceExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler({VersionConflictException.class, OptimisticLockingFailureException.class})
   ResponseEntity<Object> versionConflict(RuntimeException e, WebRequest request) {
     return respond(ErrorCode.COMMON_VERSION_CONFLICT, request);
+  }
+
+  /** 자격 오류·정지 계정·버전 변경·없는 세션을 같은 응답으로 묶어 계정 존재 여부를 드러내지 않는다. */
+  @ExceptionHandler(AuthenticationFailedException.class)
+  ResponseEntity<Object> authenticationFailed(AuthenticationFailedException e, WebRequest request) {
+    return respond(ErrorCode.COMMON_AUTHENTICATION_REQUIRED, request);
+  }
+
+  @ExceptionHandler(AuthRateLimitedException.class)
+  ResponseEntity<Object> rateLimited(AuthRateLimitedException e, WebRequest request) {
+    ErrorCode code = ErrorCode.COMMON_RATE_LIMITED;
+    return ResponseEntity.status(code.status())
+        .header(HttpHeaders.RETRY_AFTER, Long.toString(e.retryAfterSeconds()))
+        .body(problem(code.status(), code, code.detail(), request));
+  }
+
+  /** 인증 저장소를 확인하지 못했으므로 토큰 발급·삭제를 성공으로 안내하지 않는다. 사유는 로그에만 남긴다. */
+  @ExceptionHandler(AuthenticationUnavailableException.class)
+  ResponseEntity<Object> authenticationUnavailable(
+      AuthenticationUnavailableException e, WebRequest request) {
+    LOGGER
+        .atWarn()
+        .addKeyValue("event", "commerce.auth")
+        .addKeyValue("errorCode", ErrorCode.COMMON_TEMPORARILY_UNAVAILABLE.name())
+        .addKeyValue("reason", e.getMessage())
+        .addKeyValue("traceId", traceId())
+        .log("User authentication store is unavailable");
+    return respond(
+        ErrorCode.COMMON_TEMPORARILY_UNAVAILABLE,
+        "일시적으로 인증을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+        null,
+        request);
   }
 
   @ExceptionHandler(AccountEmailDuplicatedException.class)

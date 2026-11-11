@@ -2,6 +2,8 @@ dependencies {
     implementation project(':internal-auth')
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // 로그인 요청 제한·세션 발급·로그아웃의 Redis 스크립트 실행. 공유 Lettuce 연결을 쓴다.
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-batch'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.kafka:spring-kafka'

@@ -13,6 +13,9 @@ public interface AccountRepository {
   /** 삭제한 계정도 포함한다. 이메일은 정규화한 값이다. */
   boolean emailExists(ActorKind kind, String emailNormalized);
 
+  /** 삭제·정지한 계정도 돌려준다. 로그인 가능 여부는 호출자가 계정 상태로 판단한다. */
+  Optional<Account> findByEmail(ActorKind kind, String emailNormalized);
+
   /**
    * 새 계정을 즉시 DB에 반영한다. 같은 종류의 이메일을 다른 트랜잭션이 먼저 저장했다면 그 트랜잭션이 끝나기를 잠금 대기 상한까지 기다린 뒤 {@link
    * AccountEmailDuplicatedException}을 던진다.

@@ -26,6 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
       "management.tracing.enabled=false",
+      "app.auth.session-epoch=00000000-0000-4000-8000-000000000000",
       "app.auth.rate-limit.identifier-hmac-key=internal-caller-test-hmac-key-32bytes",
       "app.internal-auth.senders.gateway.current=" + InternalCallerIntegrationTest.GATEWAY,
       "app.internal-auth.senders[operator\\:ops-1].current="

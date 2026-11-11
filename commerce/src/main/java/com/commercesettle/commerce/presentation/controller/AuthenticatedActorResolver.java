@@ -3,6 +3,7 @@ package com.commercesettle.commerce.presentation.controller;
 import com.commercesettle.commerce.domain.model.ActorKind;
 import com.commercesettle.internalauth.InternalCallerFilter;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.ErrorResponseException;
@@ -12,17 +13,23 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
- * 내부 호출 필터가 신뢰한 Gateway 신원 헤더를 {@link AuthenticatedBuyer}·{@link AuthenticatedSeller} 인자로 바꾼다. 발신자
- * 확인은 필터가 맡고, 여기서는 계정 종류를 다시 확인해 Gateway 작업 매핑 오류를 마지막으로 막는다. 신원이 없거나 형식이 틀리면 401, 종류가 다르면 403이다.
+ * 내부 호출 필터가 신뢰한 Gateway 신원 헤더를 {@link AuthenticatedBuyer}·{@link AuthenticatedSeller}·{@link
+ * AuthenticatedSession} 인자로 바꾼다. 발신자 확인은 필터가 맡고, 여기서는 계정 종류를 다시 확인해 Gateway 작업 매핑 오류를 마지막으로 막는다.
+ * 신원·세션 해시가 없거나 형식이 틀리면 401, 종류가 다르면 403이다.
  */
 public class AuthenticatedActorResolver implements HandlerMethodArgumentResolver {
   public static final String ACTOR_KIND = InternalCallerFilter.ACTOR_KIND;
   public static final String ACTOR_ID = InternalCallerFilter.ACTOR_ID;
+  public static final String SESSION_HASH = "X-Authenticated-Session-Hash";
+
+  private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
 
   @Override
   public boolean supportsParameter(MethodParameter parameter) {
     Class<?> type = parameter.getParameterType();
-    return type == AuthenticatedBuyer.class || type == AuthenticatedSeller.class;
+    return type == AuthenticatedBuyer.class
+        || type == AuthenticatedSeller.class
+        || type == AuthenticatedSession.class;
   }
 
   @Override
@@ -33,6 +40,9 @@ public class AuthenticatedActorResolver implements HandlerMethodArgumentResolver
       WebDataBinderFactory binders) {
     ActorKind kind = kind(request.getHeader(ACTOR_KIND));
     UUID id = id(request.getHeader(ACTOR_ID));
+    if (parameter.getParameterType() == AuthenticatedSession.class) {
+      return new AuthenticatedSession(kind, id, sessionHash(request.getHeader(SESSION_HASH)));
+    }
     ActorKind expected =
         parameter.getParameterType() == AuthenticatedBuyer.class
             ? ActorKind.BUYER
@@ -59,6 +69,11 @@ public class AuthenticatedActorResolver implements HandlerMethodArgumentResolver
     } catch (IllegalArgumentException e) {
       // 아래에서 인증 실패로 응답한다.
     }
+    throw new ErrorResponseException(HttpStatus.UNAUTHORIZED);
+  }
+
+  private static String sessionHash(String value) {
+    if (value != null && HASH.matcher(value).matches()) return value;
     throw new ErrorResponseException(HttpStatus.UNAUTHORIZED);
   }
 }

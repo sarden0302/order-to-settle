@@ -49,6 +49,14 @@ class JpaAccountRepository implements AccountRepository {
   }
 
   @Override
+  public Optional<Account> findByEmail(ActorKind kind, String emailNormalized) {
+    return switch (kind) {
+      case BUYER -> buyers.findByEmailNormalized(emailNormalized).map(Account.class::cast);
+      case SELLER -> sellers.findByEmailNormalized(emailNormalized).map(Account.class::cast);
+    };
+  }
+
+  @Override
   public <T extends Account> T add(T account) {
     TransactionLimits.apply(jdbc);
     try {
