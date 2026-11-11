@@ -2,6 +2,7 @@ package com.commercesettle.commerce.presentation.exception;
 
 import com.commercesettle.commerce.application.exception.IdempotencyConflictException;
 import com.commercesettle.commerce.application.exception.OrderRequestException;
+import com.commercesettle.commerce.domain.exception.AccountEmailDuplicatedException;
 import com.commercesettle.commerce.domain.exception.CouponCampaignConflictException;
 import com.commercesettle.commerce.domain.exception.CouponIssueRunNotFoundException;
 import com.commercesettle.commerce.domain.exception.CouponRecipientNotFoundException;
@@ -117,6 +118,11 @@ public class CommerceExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler({VersionConflictException.class, OptimisticLockingFailureException.class})
   ResponseEntity<Object> versionConflict(RuntimeException e, WebRequest request) {
     return respond(ErrorCode.COMMON_VERSION_CONFLICT, request);
+  }
+
+  @ExceptionHandler(AccountEmailDuplicatedException.class)
+  ResponseEntity<Object> emailDuplicated(AccountEmailDuplicatedException e, WebRequest request) {
+    return respond(ErrorCode.ACCOUNT_EMAIL_DUPLICATED, request);
   }
 
   @ExceptionHandler(IdempotencyConflictException.class)

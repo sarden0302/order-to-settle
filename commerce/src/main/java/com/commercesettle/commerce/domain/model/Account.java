@@ -6,6 +6,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -28,6 +30,23 @@ public abstract class Account extends AuditableEntity {
   @Version private Long version;
 
   protected Account() {}
+
+  /** 새 계정은 활성 상태, 인증 버전 0으로 시작한다. 이메일은 {@link #normalizeEmail}을 거친 값을 받는다. */
+  protected Account(
+      UUID id, String emailNormalized, String passwordHash, String displayName, Instant now) {
+    super(now);
+    this.id = Objects.requireNonNull(id, "id");
+    this.emailNormalized = Objects.requireNonNull(emailNormalized, "emailNormalized");
+    this.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash");
+    this.displayName = Objects.requireNonNull(displayName, "displayName");
+    this.status = AccountStatus.ACTIVE;
+    this.authVersion = 0;
+  }
+
+  /** 앞뒤 공백을 지우고 소문자로 맞춘다. 가입·로그인·요청 제한 키가 같은 값을 쓴다. */
+  public static String normalizeEmail(String email) {
+    return email.strip().toLowerCase(Locale.ROOT);
+  }
 
   public abstract ActorKind kind();
 

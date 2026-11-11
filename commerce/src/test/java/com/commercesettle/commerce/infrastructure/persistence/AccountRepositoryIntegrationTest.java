@@ -22,6 +22,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(
     properties = {
       "management.tracing.enabled=false",
+      "app.auth.rate-limit.identifier-hmac-key=account-repository-test-hmac-key-32bytes",
       "app.internal-auth.senders.gateway.current=test-gateway-credential-0123456789abcdef0123"
     })
 @Testcontainers
