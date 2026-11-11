@@ -168,8 +168,9 @@ app:
   auth:
     # 세션 키의 인증 세대. Gateway와 같은 UUID를 쓰며 없으면 기동하지 않는다.
     session-epoch: ${AUTH_SESSION_EPOCH}
-    # 승인한 Redis 실행 식별자(INFO server의 run_id). Gateway와 같은 값이며 없거나 형식이 틀리면 기동하지 않는다.
-    redis-run-id: ${AUTH_REDIS_RUN_ID}
+    # 승인한 Redis 실행 식별자(INFO server의 run_id). Gateway와 같은 값이다. 앱 기동과 인증 허용은 별개라, 없거나 현재
+    # Redis와 다르면 기동은 하되 로그인·로그아웃을 503으로 막는다. docs/development.md#redis-세션-검증과-복구
+    redis-run-id: ${AUTH_REDIS_RUN_ID:}
     rate-limit:
       identifier-hmac-key: ${AUTH_RATE_LIMIT_HMAC_KEY}
       # 프로젝트 시작 기본값. docs/policies.md#로그인복구-요청-제한
@@ -189,7 +190,4 @@ app:
       gateway:
         current: ${COMMERCE_GATEWAY_CREDENTIAL}
         previous: ${COMMERCE_GATEWAY_CREDENTIAL_PREVIOUS:}
-      # Settlement의 지급 컨텍스트 조회(GET /internal/products/{productId}/settlement-context).
-      "[service:settlement]":
-        current: ${COMMERCE_SETTLEMENT_CREDENTIAL}
-        previous: ${COMMERCE_SETTLEMENT_CREDENTIAL_PREVIOUS:}
+      # 서비스·운영자 발신자는 그 발신자가 호출하는 작업을 구현할 때 함께 추가한다.

@@ -70,9 +70,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # 컴파일이 복구된 모듈을 여기에 추가합니다. 예: ':commerce:check'
+          # 컴파일이 복구된 모듈을 여기에 추가합니다.
           - group: demo-control
             tasks: ':demo-control:check'
+          - group: commerce
+            tasks: ':commerce:check :internal-auth:check'
     steps:
       - *checkout
       - *java

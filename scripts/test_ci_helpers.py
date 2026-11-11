@@ -137,7 +137,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GATE = "required-checks"
 # 소스는 있지만 재구현 전이라 아직 컴파일되지 않는 모듈입니다.
 # 컴파일을 복구하면 여기서 빼고 ci.yml의 tests 행렬에 ':<모듈>:check'를 추가합니다.
-NOT_YET_COMPILING = {"commerce"}
+NOT_YET_COMPILING = set()
 
 
 class CiGateTest(unittest.TestCase):

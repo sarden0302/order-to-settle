@@ -204,6 +204,7 @@ ArchUnit이 계층 경계와 다른 서비스 구현의 직접 import를 검사�
 | `infrastructure/messaging` | Kafka Producer·Listener, Outbox 발행기·재처리 스케줄러 |
 | `infrastructure/client` | 외부 HTTP 구현·클라이언트 전용 요청/응답 |
 | `infrastructure/cache` | Redis 세션·인증 가드·캐시·잠금 어댑터 |
+| `infrastructure/security` | 비밀번호 해시·서버 키 HMAC 같은 암호 어댑터 |
 | `infrastructure/config` | Spring 설정·클라이언트 구성·OpenAPI |
 | `infrastructure/observability` | 자기 저장소·Kafka의 읽기 전용 관측과 불변 메트릭 snapshot |
 

@@ -1,6 +1,6 @@
 package com.commercesettle.commerce.presentation.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.commercesettle.commerce.support.OpenApiContracts.matchesContract;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -25,17 +25,9 @@ import com.commercesettle.commerce.domain.model.EventAdmission;
 import com.commercesettle.commerce.domain.model.ProductInventory;
 import com.commercesettle.commerce.domain.model.SaleEvent;
 import com.commercesettle.commerce.domain.repository.PageResult;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.InputFormat;
-import com.networknt.schema.SchemaLocation;
-import com.networknt.schema.SchemaRegistry;
-import com.networknt.schema.SpecificationVersion;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -62,24 +54,9 @@ class SaleEventControllerTest {
       {"name":"주말 한정 특가","productId":"00000000-0000-0000-0000-0000000000b1","eventPrice":10000,
        "quota":1000,"startsAt":"2026-11-03T09:00:00+09:00","endsAt":"2026-11-04T09:00:00+09:00"}
       """;
-  private static SchemaRegistry contracts;
-
   @Autowired MockMvc mvc;
-  @Autowired ObjectMapper mapper;
   @MockitoBean SaleEventService events;
   @MockitoBean EventGaugeCache gauges;
-
-  @BeforeAll
-  static void loadContracts() throws Exception {
-    try (var input = SaleEventControllerTest.class.getResourceAsStream("/contracts/openapi.json")) {
-      assertThat(input).as("정식 OpenAPI 테스트 리소스").isNotNull();
-      String document = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-      contracts =
-          SchemaRegistry.withDefaultDialect(
-              SpecificationVersion.DRAFT_2020_12,
-              builder -> builder.schemas(Map.of("urn:commerce:canonical", document)));
-    }
-  }
 
   @Test
   @DisplayName("이벤트 등록은 201과 Location, 정식 Event 계약에 맞는 미공개 이벤트를 반환한다")
@@ -248,20 +225,6 @@ class SaleEventControllerTest {
     mvc.perform(get("/api/events/" + EVENT))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("COMMON_RESOURCE_NOT_FOUND"));
-  }
-
-  private void matchesContract(String name, String json) throws Exception {
-    JsonNode payload = mapper.readTree(json);
-    assertThat(
-            contracts
-                .getSchema(SchemaLocation.of("urn:commerce:canonical#/components/schemas/" + name))
-                .validate(
-                    payload.toString(),
-                    InputFormat.JSON,
-                    context ->
-                        context.executionConfig(config -> config.formatAssertionsEnabled(true))))
-        .as(name)
-        .isEmpty();
   }
 
   private static MockHttpServletRequestBuilder publication() {
