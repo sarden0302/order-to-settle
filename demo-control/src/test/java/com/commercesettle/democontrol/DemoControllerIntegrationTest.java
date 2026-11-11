@@ -32,8 +32,7 @@ class DemoControllerIntegrationTest {
   void rejectsInvalidDestinationBeforeForwarding(String target) throws Exception {
     var controller =
         new DemoController(
-            new DemoSettings(Path.of("."), target, Map.of(), Map.of(), Map.of(), false, "unused"),
-            mapper);
+            new DemoSettings(Path.of("."), target, Map.of(), Map.of(), Map.of()), mapper);
 
     assertThatThrownBy(
             () ->
@@ -95,9 +94,7 @@ class DemoControllerIntegrationTest {
                   url,
                   Map.of("commerce", url),
                   Map.of("commerce", "synthetic"),
-                  Map.of(),
-                  false,
-                  "commerce-settle-ui-load"),
+                  Map.of()),
               mapper);
       var request =
           executor.submit(
@@ -171,9 +168,7 @@ class DemoControllerIntegrationTest {
                   "http://127.0.0.1:" + upstream.getPort(),
                   Map.of(),
                   Map.of(),
-                  Map.of(),
-                  false,
-                  "commerce-settle-ui-load"),
+                  Map.of()),
               mapper);
       assertThatThrownBy(
               () ->
@@ -235,9 +230,7 @@ class DemoControllerIntegrationTest {
                   url,
                   Map.of("commerce", url),
                   Map.of("commerce", "operator-proof"),
-                  Map.of(),
-                  false,
-                  "commerce-settle-ui-load"),
+                  Map.of()),
               mapper);
       var publicResult =
           controller.execute(
@@ -293,9 +286,7 @@ class DemoControllerIntegrationTest {
                 "http://127.0.0.1:1",
                 Map.of("commerce", "http://127.0.0.1:1"),
                 Map.of(),
-                Map.of(),
-                false,
-                "commerce-settle-ui-load"),
+                Map.of()),
             mapper);
     assertThatThrownBy(
             () ->

@@ -11,6 +11,4 @@ public record DemoSettings(
     String gateway,
     Map<String, String> services,
     Map<String, String> operatorCredentials,
-    Map<String, String> monitoringLinks,
-    boolean loadEnabled,
-    String loadProject) {}
+    Map<String, String> monitoringLinks) {}

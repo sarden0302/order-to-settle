@@ -23,7 +23,7 @@ function setup(items: unknown[] = [{ id: 'product-1', name: '격리된 조회 �
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === '/demo/info') {
       if (++infoCalls <= infoFailures) throw new Error('control unavailable');
-      return response({ operatorServices: [], links: [], loadEnabled: false });
+      return response({ operatorServices: [], links: [] });
     }
     const command = JSON.parse(String(init?.body));
     if (command.operationId === 'post_api_buyer_sessions') return response({ upstreamStatus: 200,

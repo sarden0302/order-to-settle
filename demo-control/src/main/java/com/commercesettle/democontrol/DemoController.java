@@ -120,10 +120,6 @@ public class DemoController {
             .toList(),
         "timeTravel",
         false,
-        "loadEnabled",
-        settings.loadEnabled(),
-        "loadProject",
-        settings.loadProject(),
         "links",
         settings.monitoringLinks().entrySet().stream()
             .map(entry -> Map.of("title", entry.getKey(), "url", entry.getValue()))
